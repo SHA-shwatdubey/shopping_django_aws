@@ -57,9 +57,17 @@ data "aws_key_pair" "existing_or_new" {
   depends_on = [aws_key_pair.django_app]
 }
 
-# Security group for EC2 instance
+# Data source to check for existing security group
+data "aws_security_groups" "existing_sg" {
+  filter {
+    name   = "group-name"
+    values = ["${var.project_name}-${var.environment}-sg"]
+  }
+}
+
+# Security group for EC2 instance (create only if doesn't exist)
 resource "aws_security_group" "django_app" {
-  count       = 1
+  count       = length(data.aws_security_groups.existing_sg.ids) > 0 ? 0 : 1
   name        = "${var.project_name}-${var.environment}-sg"
   description = "Security group for Django application"
   vpc_id      = var.vpc_id
@@ -115,7 +123,8 @@ resource "aws_instance" "django_app" {
   instance_type = var.instance_type
   key_name      = data.aws_key_pair.existing_or_new.key_name
 
-  vpc_security_group_ids = [aws_security_group.django_app[0].id]
+  # Use created SG if it exists, otherwise use data source
+  vpc_security_group_ids = length(aws_security_group.django_app) > 0 ? [aws_security_group.django_app[0].id] : data.aws_security_groups.existing_sg.ids
   subnet_id              = var.subnet_id
 
   # Root volume configuration
@@ -137,7 +146,7 @@ resource "aws_instance" "django_app" {
 
   monitoring = true
 
-  depends_on = [aws_security_group.django_app[0]]
+  depends_on = [aws_security_group.django_app]
 }
 
 # Elastic IP for static public IP (optional)
