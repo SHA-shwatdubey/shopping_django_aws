@@ -136,7 +136,7 @@ resource "aws_instance" "django_app" {
 
   monitoring = true
 
-  depends_on = aws_security_group.django_app
+  depends_on = [aws_security_group.django_app[0]]
 }
 
 # Elastic IP for static public IP (optional)
