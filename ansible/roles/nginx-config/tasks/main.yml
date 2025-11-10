@@ -1,0 +1,43 @@
+---
+- name: Create Nginx configuration for Django app
+  template:
+    src: nginx_django.j2
+    dest: /etc/nginx/sites-available/django-app
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart nginx
+
+- name: Enable Nginx site
+  file:
+    src: /etc/nginx/sites-available/django-app
+    dest: /etc/nginx/sites-enabled/django-app
+    state: link
+  notify: restart nginx
+
+- name: Disable default Nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: restart nginx
+
+- name: Ensure Nginx default site is removed
+  file:
+    path: /etc/nginx/sites-available/default
+    state: absent
+
+- name: Test Nginx configuration
+  command: nginx -t
+  register: nginx_test
+  failed_when: nginx_test.rc != 0
+
+- name: Display Nginx test result
+  debug:
+    msg: "Nginx configuration test: {{ nginx_test.stdout }}"
+
+handlers:
+  - name: restart nginx
+    systemd:
+      name: nginx
+      state: restarted
+      daemon_reload: yes

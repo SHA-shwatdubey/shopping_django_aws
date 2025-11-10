@@ -1,0 +1,78 @@
+---
+- name: Ensure application directory exists
+  file:
+    path: "{{ app_directory }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0755'
+
+- name: Clone or update Django repository
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ app_directory }}"
+    version: "{{ repo_branch }}"
+    force: yes
+  become_user: "{{ app_user }}"
+
+- name: Create Python virtual environment
+  command: "python3.11 -m venv {{ venv_directory }}"
+  args:
+    creates: "{{ venv_directory }}/bin/activate"
+  become_user: "{{ app_user }}"
+
+- name: Upgrade pip in virtual environment
+  pip:
+    name:
+      - pip
+      - setuptools
+      - wheel
+    state: latest
+    virtualenv: "{{ venv_directory }}"
+    virtualenv_command: "python3.11 -m venv"
+
+- name: Install Django and dependencies
+  pip:
+    name:
+      - Django>=4.0
+      - gunicorn
+      - psycopg2-binary
+      - python-decouple
+    virtualenv: "{{ venv_directory }}"
+    virtualenv_command: "python3.11 -m venv"
+  become_user: "{{ app_user }}"
+
+- name: Install requirements.txt if it exists
+  pip:
+    requirements: "{{ app_directory }}/requirements.txt"
+    virtualenv: "{{ venv_directory }}"
+    virtualenv_command: "python3.11 -m venv"
+  when: "'requirements.txt' in lookup('file', app_directory, errors='ignore')"
+  ignore_errors: yes
+  become_user: "{{ app_user }}"
+
+- name: Create .env file for Django settings
+  template:
+    src: django_env.j2
+    dest: "{{ app_directory }}/.env"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0600'
+
+- name: Run Django migrations
+  django_manage:
+    command: migrate
+    app_path: "{{ app_directory }}"
+    virtualenv: "{{ venv_directory }}"
+  become_user: "{{ app_user }}"
+  environment:
+    DJANGO_SETTINGS_MODULE: "shoppinglyx.settings"
+
+- name: Collect static files
+  django_manage:
+    command: collectstatic
+    app_path: "{{ app_directory }}"
+    virtualenv: "{{ venv_directory }}"
+  become_user: "{{ app_user }}"
+  environment:
+    DJANGO_SETTINGS_MODULE: "shoppinglyx.settings"

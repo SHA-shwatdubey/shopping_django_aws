@@ -1,0 +1,172 @@
+name: Deploy Django App to AWS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  AWS_REGION: us-east-1
+  TERRAFORM_VERSION: 1.6.0
+
+jobs:
+  terraform:
+    name: Terraform Plan & Apply
+    runs-on: ubuntu-latest
+    outputs:
+      instance_ip: ${{ steps.terraform-output.outputs.instance_ip }}
+      instance_id: ${{ steps.terraform-output.outputs.instance_id }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        working-directory: ./terraform
+        continue-on-error: true
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./terraform
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan -var-file=terraform.tfvars
+        working-directory: ./terraform
+        env:
+          TF_VAR_public_key_path: ~/.ssh/id_rsa.pub
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+        working-directory: ./terraform
+
+      - name: Extract Terraform Outputs
+        id: terraform-output
+        run: |
+          cd terraform
+          instance_ip=$(terraform output -raw instance_public_ip)
+          instance_id=$(terraform output -raw instance_id)
+          echo "instance_ip=$instance_ip" >> $GITHUB_OUTPUT
+          echo "instance_id=$instance_id" >> $GITHUB_OUTPUT
+          echo "Instance IP: $instance_ip"
+          echo "Instance ID: $instance_id"
+
+      - name: Save Terraform State
+        run: |
+          mkdir -p /tmp/terraform-state
+          cp -r terraform/.terraform /tmp/terraform-state/ || true
+          cp terraform/tfplan /tmp/terraform-state/ || true
+          cp terraform/terraform.tfstate* /tmp/terraform-state/ || true
+
+      - name: Upload Terraform State
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-state
+          path: /tmp/terraform-state/
+          retention-days: 7
+
+  ansible:
+    name: Deploy with Ansible
+    needs: terraform
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python for Ansible
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Ansible and dependencies
+        run: |
+          pip install --upgrade pip
+          pip install ansible>=2.10 boto3 botocore
+
+      - name: Create SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.terraform.outputs.instance_ip }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Create dynamic inventory
+        run: |
+          cat > ansible/inventory.ini <<EOF
+          [django_servers]
+          django_server_1 ansible_host=${{ needs.terraform.outputs.instance_ip }} ansible_user=ubuntu
+          
+          [django_servers:vars]
+          ansible_python_interpreter=/usr/bin/python3
+          django_repo_url=https://github.com/${{ github.repository }}.git
+          django_secret_key=${{ secrets.DJANGO_SECRET_KEY }}
+          EOF
+          cat ansible/inventory.ini
+
+      - name: Wait for EC2 instance to be ready
+        run: |
+          echo "Waiting for instance ${{ needs.terraform.outputs.instance_ip }} to be ready..."
+          for i in {1..30}; do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@${{ needs.terraform.outputs.instance_ip }} "echo Instance is ready"; then
+              echo "Instance is ready!"
+              break
+            fi
+            echo "Attempt $i/30: Instance not ready yet, retrying in 10 seconds..."
+            sleep 10
+          done
+
+      - name: Run Ansible playbook
+        run: |
+          ansible-playbook \
+            -i ansible/inventory.ini \
+            -u ubuntu \
+            --private-key ~/.ssh/id_rsa \
+            -v \
+            ansible/site.yml
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: 'False'
+
+      - name: Verify deployment
+        run: |
+          echo "Checking Django application status..."
+          ssh -o StrictHostKeyChecking=no \
+            -i ~/.ssh/id_rsa \
+            ubuntu@${{ needs.terraform.outputs.instance_ip }} \
+            "sudo systemctl status gunicorn && sudo systemctl status nginx"
+
+      - name: Post-deployment message
+        run: |
+          echo "✅ Deployment successful!"
+          echo "Django app is running at: http://${{ needs.terraform.outputs.instance_ip }}"
+          echo "SSH connection: ssh -i ~/.ssh/id_rsa ubuntu@${{ needs.terraform.outputs.instance_ip }}"
+
+  notify:
+    name: Notification
+    needs: [terraform, ansible]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Deployment Status
+        run: |
+          if [ "${{ needs.terraform.result }}" == "success" ] && [ "${{ needs.ansible.result }}" == "success" ]; then
+            echo "✅ Deployment completed successfully!"
+          else
+            echo "❌ Deployment failed!"
+            exit 1
+          fi

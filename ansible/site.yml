@@ -1,0 +1,52 @@
+---
+- name: Deploy Django Application
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  vars:
+    app_user: "ubuntu"
+    app_group: "ubuntu"
+    app_directory: "/var/www/django-app"
+    app_name: "shoppinglyx"
+    repo_url: "{{ django_repo_url }}"  # Passed from GitHub Actions
+    repo_branch: "main"
+    python_version: "3.11"
+    venv_directory: "{{ app_directory }}/venv"
+    gunicorn_port: 8000
+
+  pre_tasks:
+    - name: Wait for system to be ready
+      wait_for_connection:
+        delay: 10
+        timeout: 60
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+  roles:
+    - { role: dependencies, tags: ['dependencies'] }
+    - { role: django-deploy, tags: ['deploy'] }
+    - { role: nginx-config, tags: ['nginx'] }
+    - { role: gunicorn-config, tags: ['gunicorn'] }
+
+  post_tasks:
+    - name: Start and enable services
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      loop:
+        - gunicorn
+        - nginx
+
+    - name: Display deployment status
+      debug:
+        msg: |
+          Django application deployed successfully!
+          Application URL: http://{{ inventory_hostname }}
+          Gunicorn is running on port {{ gunicorn_port }}
+          Nginx is configured as a reverse proxy

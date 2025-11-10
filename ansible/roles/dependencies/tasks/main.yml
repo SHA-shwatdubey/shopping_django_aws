@@ -1,0 +1,30 @@
+---
+- name: Install system dependencies
+  apt:
+    name:
+      - python3.11
+      - python3.11-venv
+      - python3.11-dev
+      - python3-pip
+      - build-essential
+      - libssl-dev
+      - libffi-dev
+      - curl
+      - wget
+      - git
+      - supervisor
+      - certbot
+      - python3-certbot-nginx
+    state: present
+
+- name: Install Nginx
+  apt:
+    name: nginx
+    state: present
+
+- name: Ensure Nginx is installed and available
+  systemd:
+    name: nginx
+    state: stopped
+    enabled: no
+  ignore_errors: yes

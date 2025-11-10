@@ -1,0 +1,30 @@
+[Unit]
+Description=Gunicorn daemon for Django application
+After=network.target
+
+[Service]
+Type=notify
+User={{ app_user }}
+Group={{ app_group }}
+WorkingDirectory={{ app_directory }}
+ExecStart={{ venv_directory }}/bin/gunicorn \
+    --workers 4 \
+    --worker-class sync \
+    --bind 127.0.0.1:{{ gunicorn_port }} \
+    --access-logfile /var/log/gunicorn/access.log \
+    --error-logfile /var/log/gunicorn/error.log \
+    --log-level info \
+    shoppinglyx.wsgi:application
+
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+KillSignal=SIGTERM
+Restart=always
+RestartSec=10
+
+# Security settings
+ProtectSystem=full
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,33 @@
+---
+- name: Create Gunicorn systemd service file
+  template:
+    src: gunicorn.service.j2
+    dest: /etc/systemd/system/gunicorn.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: daemon reload and restart gunicorn
+
+- name: Create Gunicorn systemd socket file
+  template:
+    src: gunicorn.socket.j2
+    dest: /etc/systemd/system/gunicorn.socket
+    owner: root
+    group: root
+    mode: '0644'
+  notify: daemon reload
+
+- name: Ensure systemd daemon is reloaded
+  systemd:
+    daemon_reload: yes
+
+handlers:
+  - name: daemon reload
+    systemd:
+      daemon_reload: yes
+
+  - name: daemon reload and restart gunicorn
+    systemd:
+      daemon_reload: yes
+      name: gunicorn
+      state: restarted
