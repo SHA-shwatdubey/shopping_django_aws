@@ -75,20 +75,22 @@
 
 - name: Run Django migrations
   shell: |
-    source {{ venv_directory }}/bin/activate
-    cd {{ app_directory }}
-    python manage.py migrate --noinput
+    bash -c "source {{ venv_directory }}/bin/activate && cd {{ app_directory }} && python manage.py migrate --noinput"
+  args:
+    executable: /bin/bash
   become_user: "{{ app_user }}"
   environment:
     DJANGO_SETTINGS_MODULE: "shoppinglyx.settings"
+    PATH: "{{ venv_directory }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   ignore_errors: yes
 
 - name: Collect static files
   shell: |
-    source {{ venv_directory }}/bin/activate
-    cd {{ app_directory }}
-    python manage.py collectstatic --noinput
+    bash -c "source {{ venv_directory }}/bin/activate && cd {{ app_directory }} && python manage.py collectstatic --noinput"
+  args:
+    executable: /bin/bash
   become_user: "{{ app_user }}"
   environment:
     DJANGO_SETTINGS_MODULE: "shoppinglyx.settings"
+    PATH: "{{ venv_directory }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   ignore_errors: yes
