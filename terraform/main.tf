@@ -33,27 +33,18 @@ locals {
   key_pair_name = "${var.project_name}-${var.environment}-key"
 }
 
-# Check if key pair already exists
-data "aws_key_pair" "existing" {
-  count      = 1
-  key_name   = local.key_pair_name
-  depends_on = [aws_key_pair.django_app]
-}
-
-# Create key pair only if requested (default: false to avoid conflicts)
+# Create key pair (will use existing if already created)
 resource "aws_key_pair" "django_app" {
-  count      = var.create_key_pair ? 1 : 0
   key_name   = local.key_pair_name
   public_key = file(var.public_key_path)
 
   tags = {
     Name = "${var.project_name}-${var.environment}-keypair"
   }
-}
 
-# Use existing key pair if it exists (don't create new one)
-locals {
-  key_pair = var.create_key_pair ? aws_key_pair.django_app[0] : data.aws_key_pair.existing[0]
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
 # Security group for EC2 instance
@@ -112,7 +103,7 @@ resource "aws_security_group" "django_app" {
 resource "aws_instance" "django_app" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = var.instance_type
-  key_name      = local.key_pair.key_name
+  key_name      = aws_key_pair.django_app.key_name
 
   vpc_security_group_ids = [aws_security_group.django_app[0].id]
   subnet_id              = var.subnet_id
