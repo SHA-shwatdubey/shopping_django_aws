@@ -28,30 +28,37 @@ provider "aws" {
   }
 }
 
+# Local to check if key pair should be created
+locals {
+  key_pair_name = "${var.project_name}-${var.environment}-key"
+}
+
 # Check if key pair already exists
 data "aws_key_pair" "existing" {
-  key_name           = "${var.project_name}-${var.environment}-key"
-  include_public_key = true
-
+  count      = 1
+  key_name   = local.key_pair_name
   depends_on = [aws_key_pair.django_app]
 }
 
-# Generate or use existing SSH key pair
+# Create key pair only if requested (default: false to avoid conflicts)
 resource "aws_key_pair" "django_app" {
-  key_name   = "${var.project_name}-${var.environment}-key"
+  count      = var.create_key_pair ? 1 : 0
+  key_name   = local.key_pair_name
   public_key = file(var.public_key_path)
 
   tags = {
     Name = "${var.project_name}-${var.environment}-keypair"
   }
+}
 
-  lifecycle {
-    ignore_changes = all
-  }
+# Use existing key pair if it exists (don't create new one)
+locals {
+  key_pair = var.create_key_pair ? aws_key_pair.django_app[0] : data.aws_key_pair.existing[0]
 }
 
 # Security group for EC2 instance
 resource "aws_security_group" "django_app" {
+  count       = 1
   name        = "${var.project_name}-${var.environment}-sg"
   description = "Security group for Django application"
   vpc_id      = var.vpc_id
@@ -105,9 +112,9 @@ resource "aws_security_group" "django_app" {
 resource "aws_instance" "django_app" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = var.instance_type
-  key_name      = aws_key_pair.django_app.key_name
+  key_name      = local.key_pair.key_name
 
-  vpc_security_group_ids = [aws_security_group.django_app.id]
+  vpc_security_group_ids = [aws_security_group.django_app[0].id]
   subnet_id              = var.subnet_id
 
   # Root volume configuration
@@ -129,7 +136,7 @@ resource "aws_instance" "django_app" {
 
   monitoring = true
 
-  depends_on = [aws_security_group.django_app]
+  depends_on = aws_security_group.django_app
 }
 
 # Elastic IP for static public IP (optional)

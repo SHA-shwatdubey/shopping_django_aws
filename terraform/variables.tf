@@ -62,3 +62,10 @@ variable "use_elastic_ip" {
   type        = bool
   default     = true
 }
+
+variable "create_key_pair" {
+  description = "Whether to create a new key pair (set to false if it already exists)"
+  type        = bool
+  default     = false  # Set to false to skip key pair creation if it exists
+}
+
