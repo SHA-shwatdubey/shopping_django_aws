@@ -7,7 +7,7 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: us-west-2
   TERRAFORM_VERSION: 1.6.0
 
 jobs:
@@ -51,7 +51,7 @@ jobs:
         run: |
           TIMESTAMP=$(date +%s | tail -c 4)
           cat > terraform.tfvars <<EOF
-          aws_region      = "us-east-1"
+          aws_region      = "us-west-2"
           project_name    = "shoppinglyx"
           environment     = "prod"
           instance_type   = "t3.micro"
@@ -68,24 +68,24 @@ jobs:
           echo "Deleting orphaned AWS resources..."
           
           # Delete all shoppinglyx key pairs
-          aws ec2 describe-key-pairs --region us-east-1 --query 'KeyPairs[?starts_with(KeyName, `shoppinglyx`)].KeyName' --output text | while read key; do
+          aws ec2 describe-key-pairs --region us-west-2 --query 'KeyPairs[?starts_with(KeyName, `shoppinglyx`)].KeyName' --output text | while read key; do
             if [ ! -z "$key" ]; then
               echo "Deleting key pair: $key"
-              aws ec2 delete-key-pair --key-name "$key" --region us-east-1 2>/dev/null && echo "✓ Deleted: $key" || echo "✗ Failed: $key"
+              aws ec2 delete-key-pair --key-name "$key" --region us-west-2 2>/dev/null && echo "✓ Deleted: $key" || echo "✗ Failed: $key"
             fi
           done
           
           # Delete all shoppinglyx security groups
-          aws ec2 describe-security-groups --region us-east-1 --filters "Name=group-name,Values=shoppinglyx-*" --query 'SecurityGroups[*].GroupId' --output text | while read sg; do
+          aws ec2 describe-security-groups --region us-west-2 --filters "Name=group-name,Values=shoppinglyx-*" --query 'SecurityGroups[*].GroupId' --output text | while read sg; do
             if [ ! -z "$sg" ]; then
               echo "Deleting security group: $sg"
-              aws ec2 delete-security-group --group-id "$sg" --region us-east-1 2>/dev/null && echo "✓ Deleted: $sg" || echo "✗ Failed: $sg (may have dependencies)"
+              aws ec2 delete-security-group --group-id "$sg" --region us-west-2 2>/dev/null && echo "✓ Deleted: $sg" || echo "✗ Failed: $sg (may have dependencies)"
             fi
           done
           
           echo "Cleanup completed"
         env:
-          AWS_REGION: us-east-1
+          AWS_REGION: us-west-2
         continue-on-error: true
 
       - name: Terraform Init (for cleanup)
