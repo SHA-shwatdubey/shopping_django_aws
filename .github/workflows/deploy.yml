@@ -62,15 +62,30 @@ jobs:
           cat terraform.tfvars
         working-directory: ./terraform
 
+      - name: Terraform Init (for cleanup)
+        run: terraform init
+        working-directory: ./terraform
+        continue-on-error: true
+
+      - name: Terraform Destroy Previous Resources
+        run: terraform destroy -auto-approve -var-file=terraform.tfvars || true
+        working-directory: ./terraform
+        continue-on-error: true
+
       - name: Clean Terraform State (Remove conflicting resources)
         run: |
-          # Remove resources that might already exist in AWS
-          terraform state rm aws_key_pair.django_app || true
-          terraform state rm aws_security_group.django_app || true
-          terraform state rm aws_security_group_rule.django_app_ingress_ssh || true
-          terraform state rm aws_security_group_rule.django_app_ingress_http || true
-          terraform state rm aws_security_group_rule.django_app_ingress_https || true
-          terraform state rm aws_security_group_rule.django_app_egress || true
+          # Backup old state
+          cp terraform.tfstate terraform.tfstate.backup || true
+          
+          # Remove ALL state resources that might conflict
+          terraform state list 2>/dev/null | while read resource; do
+            case "$resource" in
+              aws_key_pair*|aws_security_group*|aws_security_group_rule*)
+                terraform state rm "$resource" || true
+                ;;
+            esac
+          done
+          
           echo "Terraform state cleaned"
         working-directory: ./terraform
         continue-on-error: true
