@@ -133,20 +133,17 @@ jobs:
         run: |
           cd terraform
           
-          # Get outputs using simple terraform output command
-          raw_instance_ip=$(terraform output -raw instance_public_ip 2>/dev/null || true)
-          raw_instance_id=$(terraform output -raw instance_id 2>/dev/null || true)
+          # Get outputs and extract only valid IP/ID values
+          raw_instance_ip=$(terraform output -raw instance_public_ip 2>/dev/null | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' || true)
+          raw_instance_id=$(terraform output -raw instance_id 2>/dev/null | grep -oE '^i-[a-f0-9]{17}' || true)
 
-          instance_ip=$(echo "$raw_instance_ip" | tail -n 1 | tr -d '"')
-          instance_id=$(echo "$raw_instance_id" | tail -n 1 | tr -d '"')
+          instance_ip="${raw_instance_ip:-98.81.110.254}"
+          instance_id="${raw_instance_id:-i-06fbd228352243e33}"
           
-          # Set defaults if empty
-          if [ -z "$instance_ip" ]; then
+          # Validate IP is reasonable
+          if [ -z "$instance_ip" ] || [ "$instance_ip" = "98.81.110.254" ]; then
+            echo "⚠️ Using fallback IP: 98.81.110.254"
             instance_ip="98.81.110.254"
-          fi
-          
-          if [ -z "$instance_id" ]; then
-            instance_id="i-06fbd228352243e33"
           fi
           
           # Export to GITHUB_OUTPUT
@@ -201,15 +198,31 @@ jobs:
 
       - name: Create dynamic inventory
         run: |
-          {
-            echo "[django_servers]"
-            echo "django_server_1 ansible_host=${{ needs.terraform.outputs.instance_ip }} ansible_user=ubuntu"
-            echo
-            echo "[django_servers:vars]"
-            echo "ansible_python_interpreter=/usr/bin/python3"
-            echo "django_repo_url=https://github.com/${{ github.repository }}.git"
-            echo "django_secret_key=${{ secrets.DJANGO_SECRET_KEY }}"
-          } > ansible/inventory.ini
+          INSTANCE_IP="${{ needs.terraform.outputs.instance_ip }}"
+          REPO_URL="${{ github.repository }}"
+          SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
+          
+          # Sanitize and validate
+          INSTANCE_IP=$(echo "$INSTANCE_IP" | tr -d ' "')
+          
+          echo "Creating inventory with IP: $INSTANCE_IP"
+          
+          cat > ansible/inventory.ini <<'INVENTORY'
+          [django_servers]
+          django_server_1 ansible_host=INSTANCE_IP_PLACEHOLDER ansible_user=ubuntu
+          
+          [django_servers:vars]
+          ansible_python_interpreter=/usr/bin/python3
+          django_repo_url=https://github.com/REPO_URL_PLACEHOLDER.git
+          django_secret_key=SECRET_KEY_PLACEHOLDER
+          INVENTORY
+          
+          # Replace placeholders with actual values
+          sed -i "s|INSTANCE_IP_PLACEHOLDER|$INSTANCE_IP|g" ansible/inventory.ini
+          sed -i "s|REPO_URL_PLACEHOLDER|$REPO_URL|g" ansible/inventory.ini
+          sed -i "s|SECRET_KEY_PLACEHOLDER|$SECRET_KEY|g" ansible/inventory.ini
+          
+          echo "=== Generated Inventory ==="
           cat ansible/inventory.ini
 
       - name: Wait for EC2 instance to be ready
