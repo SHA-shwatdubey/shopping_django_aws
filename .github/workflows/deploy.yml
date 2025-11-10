@@ -202,15 +202,15 @@ jobs:
 
       - name: Create dynamic inventory
         run: |
-          cat > ansible/inventory.ini <<EOF
-          [django_servers]
-          django_server_1 ansible_host="${{ needs.terraform.outputs.instance_ip }}" ansible_user="ubuntu"
-          
-          [django_servers:vars]
-          ansible_python_interpreter=/usr/bin/python3
-          django_repo_url=https://github.com/${{ github.repository }}.git
-          django_secret_key=${{ secrets.DJANGO_SECRET_KEY }}
-          EOF
+          {
+            echo "[django_servers]"
+            echo "django_server_1 ansible_host=${{ needs.terraform.outputs.instance_ip }} ansible_user=ubuntu"
+            echo
+            echo "[django_servers:vars]"
+            echo "ansible_python_interpreter=/usr/bin/python3"
+            echo "django_repo_url=https://github.com/${{ github.repository }}.git"
+            echo "django_secret_key=${{ secrets.DJANGO_SECRET_KEY }}"
+          } > ansible/inventory.ini
           cat ansible/inventory.ini
 
       - name: Wait for EC2 instance to be ready
