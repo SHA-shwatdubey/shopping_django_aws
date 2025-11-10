@@ -32,11 +32,10 @@ provider "aws" {
 locals {
   key_pair_name = "${var.project_name}-${var.environment}-key"
   # Set to true to create new resources, false to use existing
-  create_resources = false
+  create_resources = true
 }
 
 # Create key pair (will use existing if already created)
-# Note: Set lifecycle ignore_changes to handle existing resources
 resource "aws_key_pair" "django_app" {
   count      = local.create_resources ? 1 : 0
   key_name   = local.key_pair_name
@@ -45,9 +44,13 @@ resource "aws_key_pair" "django_app" {
   tags = {
     Name = "${var.project_name}-${var.environment}-keypair"
   }
+
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
-# Data source to get existing key pair
+# Data source to get new or existing key pair
 data "aws_key_pair" "existing_or_new" {
   key_name = local.key_pair_name
   
