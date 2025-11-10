@@ -6,20 +6,17 @@
     owner: root
     group: root
     mode: '0644'
-  notify: restart nginx
 
 - name: Enable Nginx site
   file:
     src: /etc/nginx/sites-available/django-app
     dest: /etc/nginx/sites-enabled/django-app
     state: link
-  notify: restart nginx
 
 - name: Disable default Nginx site
   file:
     path: /etc/nginx/sites-enabled/default
     state: absent
-  notify: restart nginx
 
 - name: Ensure Nginx default site is removed
   file:
@@ -34,3 +31,9 @@
 - name: Display Nginx test result
   debug:
     msg: "Nginx configuration test: {{ nginx_test.stdout }}"
+
+- name: Restart Nginx to apply configuration changes
+  systemd:
+    name: nginx
+    state: restarted
+    daemon_reload: yes

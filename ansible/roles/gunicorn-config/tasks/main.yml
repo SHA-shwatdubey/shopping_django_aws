@@ -6,7 +6,6 @@
     owner: root
     group: root
     mode: '0644'
-  notify: daemon reload and restart gunicorn
 
 - name: Create Gunicorn systemd socket file
   template:
@@ -15,8 +14,11 @@
     owner: root
     group: root
     mode: '0644'
-  notify: daemon reload
-
 - name: Ensure systemd daemon is reloaded
   systemd:
     daemon_reload: yes
+
+- name: Restart Gunicorn service
+  systemd:
+    name: gunicorn
+    state: restarted
