@@ -31,20 +31,27 @@ provider "aws" {
 # Local to check if key pair should be created
 locals {
   key_pair_name = "${var.project_name}-${var.environment}-key"
+  # Set to true to create new resources, false to use existing
+  create_resources = false
 }
 
 # Create key pair (will use existing if already created)
+# Note: Set lifecycle ignore_changes to handle existing resources
 resource "aws_key_pair" "django_app" {
+  count      = local.create_resources ? 1 : 0
   key_name   = local.key_pair_name
   public_key = file(var.public_key_path)
 
   tags = {
     Name = "${var.project_name}-${var.environment}-keypair"
   }
+}
 
-  lifecycle {
-    ignore_changes = all
-  }
+# Data source to get existing key pair
+data "aws_key_pair" "existing_or_new" {
+  key_name = local.key_pair_name
+  
+  depends_on = [aws_key_pair.django_app]
 }
 
 # Security group for EC2 instance
@@ -103,7 +110,7 @@ resource "aws_security_group" "django_app" {
 resource "aws_instance" "django_app" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = var.instance_type
-  key_name      = aws_key_pair.django_app.key_name
+  key_name      = data.aws_key_pair.existing_or_new.key_name
 
   vpc_security_group_ids = [aws_security_group.django_app[0].id]
   subnet_id              = var.subnet_id

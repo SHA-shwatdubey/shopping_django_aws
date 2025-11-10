@@ -25,7 +25,7 @@ output "security_group_id" {
 
 output "key_pair_name" {
   description = "Name of the SSH key pair"
-  value       = aws_key_pair.django_app.key_name
+  value       = data.aws_key_pair.existing_or_new.key_name
 }
 
 output "ssh_connection_string" {
