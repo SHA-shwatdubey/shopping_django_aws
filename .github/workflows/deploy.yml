@@ -57,7 +57,7 @@ jobs:
           root_volume_size = 20
           public_key_path = "$HOME/.ssh/id_rsa.pub"
           allowed_ssh_cidr = ["0.0.0.0/0"]
-          use_elastic_ip = true
+          use_elastic_ip = false
           EOF
           cat terraform.tfvars
         working-directory: ./terraform
