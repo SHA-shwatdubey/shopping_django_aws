@@ -30,7 +30,7 @@
 
 - name: Display Nginx test result
   debug:
-    msg: "Nginx configuration test: {{ nginx_test.stdout }}"
+    var: nginx_test.stdout
 
 - name: Restart Nginx to apply configuration changes
   systemd:
