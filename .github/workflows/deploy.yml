@@ -134,12 +134,11 @@ jobs:
           cd terraform
           
           # Get outputs using simple terraform output command
-          instance_ip=$(terraform output instance_public_ip 2>/dev/null | xargs || echo "98.81.110.254")
-          instance_id=$(terraform output instance_id 2>/dev/null | xargs || echo "")
-          
-          # Remove quotes if present
-          instance_ip=${instance_ip//\"/}
-          instance_id=${instance_id//\"/}
+          raw_instance_ip=$(terraform output -raw instance_public_ip 2>/dev/null || true)
+          raw_instance_id=$(terraform output -raw instance_id 2>/dev/null || true)
+
+          instance_ip=$(echo "$raw_instance_ip" | tail -n 1 | tr -d '"')
+          instance_id=$(echo "$raw_instance_id" | tail -n 1 | tr -d '"')
           
           # Set defaults if empty
           if [ -z "$instance_ip" ]; then
