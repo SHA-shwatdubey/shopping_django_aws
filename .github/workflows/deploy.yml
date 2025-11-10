@@ -34,6 +34,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Setup SSH Keys
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
+          cat ~/.ssh/id_rsa.pub
+
       - name: Terraform Format Check
         run: terraform fmt -check -recursive
         working-directory: ./terraform
@@ -47,7 +55,7 @@ jobs:
           environment     = "dev"
           instance_type   = "t3.micro"
           root_volume_size = 20
-          public_key_path = "~/.ssh/id_rsa.pub"
+          public_key_path = "$HOME/.ssh/id_rsa.pub"
           allowed_ssh_cidr = ["0.0.0.0/0"]
           use_elastic_ip = true
           EOF
@@ -61,8 +69,6 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -out=tfplan -var-file=terraform.tfvars
         working-directory: ./terraform
-        env:
-          TF_VAR_public_key_path: ~/.ssh/id_rsa.pub
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
