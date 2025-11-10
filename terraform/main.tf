@@ -28,6 +28,14 @@ provider "aws" {
   }
 }
 
+# Check if key pair already exists
+data "aws_key_pair" "existing" {
+  key_name           = "${var.project_name}-${var.environment}-key"
+  include_public_key = true
+
+  depends_on = [aws_key_pair.django_app]
+}
+
 # Generate or use existing SSH key pair
 resource "aws_key_pair" "django_app" {
   key_name   = "${var.project_name}-${var.environment}-key"
@@ -35,6 +43,10 @@ resource "aws_key_pair" "django_app" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-keypair"
+  }
+
+  lifecycle {
+    ignore_changes = all
   }
 }
 
@@ -82,6 +94,10 @@ resource "aws_security_group" "django_app" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-sg"
+  }
+
+  lifecycle {
+    ignore_changes = all
   }
 }
 
