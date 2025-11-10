@@ -204,7 +204,7 @@ jobs:
         run: |
           cat > ansible/inventory.ini <<EOF
           [django_servers]
-          django_server_1 ansible_host=${{ needs.terraform.outputs.instance_ip }} ansible_user=ubuntu
+          django_server_1 ansible_host="${{ needs.terraform.outputs.instance_ip }}" ansible_user="ubuntu"
           
           [django_servers:vars]
           ansible_python_interpreter=/usr/bin/python3
