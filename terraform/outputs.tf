@@ -15,30 +15,31 @@ output "instance_private_ip" {
 
 output "elastic_ip" {
   description = "Elastic IP address (if created)"
-  value       = var.use_elastic_ip ? aws_eip.django_app[0].public_ip : null
+  value       = try(aws_eip.django_app[0].public_ip, null)
 }
 
 output "security_group_id" {
   description = "ID of the security group"
-  value       = aws_security_group.django_app.id
+  value       = try(aws_security_group.django_app[0].id, "existing")
 }
 
 output "key_pair_name" {
   description = "Name of the SSH key pair"
-  value       = aws_key_pair.django_app.key_name
+  value       = try(aws_key_pair.django_app[0].key_name, local.key_pair.key_name)
 }
 
 output "ssh_connection_string" {
   description = "SSH command to connect to the instance"
-  value       = "ssh -i ${var.public_key_path} ubuntu@${var.use_elastic_ip ? aws_eip.django_app[0].public_ip : aws_instance.django_app.public_ip}"
+  value       = "ssh -i ${var.public_key_path} ubuntu@${try(aws_eip.django_app[0].public_ip, aws_instance.django_app.public_ip)}"
 }
 
 # Output for Ansible inventory
 output "ansible_inventory" {
   description = "Ansible inventory format for the EC2 instance"
   value = {
-    instance_ip   = var.use_elastic_ip ? aws_eip.django_app[0].public_ip : aws_instance.django_app.public_ip
+    instance_ip   = try(aws_eip.django_app[0].public_ip, aws_instance.django_app.public_ip)
     instance_user = "ubuntu"
     instance_id   = aws_instance.django_app.id
   }
 }
+
