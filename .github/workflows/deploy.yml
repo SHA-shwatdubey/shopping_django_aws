@@ -78,12 +78,20 @@ jobs:
         id: terraform-output
         run: |
           cd terraform
-          instance_ip=$(terraform output -raw instance_public_ip)
-          instance_id=$(terraform output -raw instance_id)
+          terraform output > /tmp/outputs.txt 2>&1 || true
+          instance_ip=$(terraform output -json instance_public_ip 2>/dev/null | tr -d '"' || echo "")
+          instance_id=$(terraform output -json instance_id 2>/dev/null | tr -d '"' || echo "")
+          
+          if [ -z "$instance_ip" ]; then
+            echo "Extracting from state file..."
+            instance_ip=$(terraform show -json tfplan 2>/dev/null | grep -o '"public_ip":"[^"]*' | head -1 | cut -d'"' -f4 || echo "")
+          fi
+          
           echo "instance_ip=$instance_ip" >> $GITHUB_OUTPUT
           echo "instance_id=$instance_id" >> $GITHUB_OUTPUT
           echo "Instance IP: $instance_ip"
           echo "Instance ID: $instance_id"
+          cat /tmp/outputs.txt
 
       - name: Save Terraform State
         run: |
