@@ -34,10 +34,3 @@
 - name: Display Nginx test result
   debug:
     msg: "Nginx configuration test: {{ nginx_test.stdout }}"
-
-handlers:
-  - name: restart nginx
-    systemd:
-      name: nginx
-      state: restarted
-      daemon_reload: yes
