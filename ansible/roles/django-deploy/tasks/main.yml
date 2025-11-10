@@ -16,13 +16,62 @@
   become_user: "{{ app_user }}"
 
 - name: List cloned directory contents
-  command: "ls -la {{ app_directory }}"
-  register: dir_contents
+  command: "find {{ app_directory }} -maxdepth 3 -type f -name '*.py' | grep -E '(manage|settings)' | head -20"
+  register: python_files
+  changed_when: false
+  ignore_errors: yes
+
+- name: Show found Python files
+  debug:
+    var: python_files.stdout_lines
+
+- name: Check for manage.py location
+  command: "find {{ app_directory }} -type f -name 'manage.py'"
+  register: manage_py_location
+  changed_when: false
+  ignore_errors: yes
+
+- name: Show manage.py path
+  debug:
+    var: manage_py_location.stdout_lines
+
+- name: Determine actual Django app location
+  shell: |
+    # Check if manage.py exists in app_directory
+    if [ -f "{{ app_directory }}/manage.py" ]; then
+      echo "{{ app_directory }}"
+      exit 0
+    fi
+    
+    # Check if it's in django_project/ subdirectory
+    if [ -f "{{ app_directory }}/django_project/manage.py" ]; then
+      echo "{{ app_directory }}/django_project"
+      exit 0
+    fi
+    
+    # Check if it's in shoppinglyx/ subdirectory
+    if [ -f "{{ app_directory }}/shoppinglyx/manage.py" ]; then
+      echo "{{ app_directory }}/shoppinglyx"
+      exit 0
+    fi
+    
+    # Search for manage.py
+    FOUND=$(find {{ app_directory }} -maxdepth 2 -name 'manage.py' -type f | head -1)
+    if [ -n "$FOUND" ]; then
+      dirname "$FOUND"
+    else
+      echo "{{ app_directory }}"
+    fi
+  register: actual_app_dir
   changed_when: false
 
-- name: Show directory contents
+- name: Set actual Django app directory
+  set_fact:
+    django_app_dir: "{{ actual_app_dir.stdout }}"
+
+- name: Show detected Django app directory
   debug:
-    var: dir_contents.stdout_lines
+    msg: "Django app directory: {{ django_app_dir }}"
 
 - name: Create Python virtual environment
   command: "python3.11 -m venv {{ venv_directory }}"
@@ -51,14 +100,14 @@
     virtualenv_command: "python3.11 -m venv"
   become_user: "{{ app_user }}"
 
-- name: Check if requirements.txt exists
+- name: Check if requirements.txt exists in app directory
   stat:
-    path: "{{ app_directory }}/requirements.txt"
+    path: "{{ django_app_dir }}/requirements.txt"
   register: requirements_check
 
 - name: Install requirements.txt if it exists
   pip:
-    requirements: "{{ app_directory }}/requirements.txt"
+    requirements: "{{ django_app_dir }}/requirements.txt"
     virtualenv: "{{ venv_directory }}"
     virtualenv_command: "python3.11 -m venv"
   when: requirements_check.stat.exists
@@ -68,14 +117,14 @@
 - name: Create .env file for Django settings
   template:
     src: django_env.j2
-    dest: "{{ app_directory }}/.env"
+    dest: "{{ django_app_dir }}/.env"
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     mode: '0600'
 
 - name: Run Django migrations
   shell: |
-    bash -c "source {{ venv_directory }}/bin/activate && cd {{ app_directory }} && python manage.py migrate --noinput"
+    bash -c "source {{ venv_directory }}/bin/activate && cd {{ django_app_dir }} && python manage.py migrate --noinput"
   args:
     executable: /bin/bash
   become_user: "{{ app_user }}"
@@ -86,7 +135,7 @@
 
 - name: Collect static files
   shell: |
-    bash -c "source {{ venv_directory }}/bin/activate && cd {{ app_directory }} && python manage.py collectstatic --noinput"
+    bash -c "source {{ venv_directory }}/bin/activate && cd {{ django_app_dir }} && python manage.py collectstatic --noinput"
   args:
     executable: /bin/bash
   become_user: "{{ app_user }}"
