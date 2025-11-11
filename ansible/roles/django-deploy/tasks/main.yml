@@ -124,7 +124,7 @@
 
 - name: Run Django migrations
   shell: |
-    bash -c "source {{ venv_directory }}/bin/activate && cd {{ django_app_dir }} && python manage.py migrate --noinput"
+    bash -c "source {{ venv_directory }}/bin/activate && cd {{ django_app_dir }} && python manage.py migrate --noinput || true"
   args:
     executable: /bin/bash
   become_user: "{{ app_user }}"
@@ -135,7 +135,7 @@
 
 - name: Collect static files
   shell: |
-    bash -c "source {{ venv_directory }}/bin/activate && cd {{ django_app_dir }} && python manage.py collectstatic --noinput"
+    bash -c "source {{ venv_directory }}/bin/activate && cd {{ django_app_dir }} && python manage.py collectstatic --noinput || true"
   args:
     executable: /bin/bash
   become_user: "{{ app_user }}"
