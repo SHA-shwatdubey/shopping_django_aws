@@ -6,7 +6,7 @@ After=network.target
 Type=notify
 User={{ app_user }}
 Group={{ app_group }}
-WorkingDirectory={{ app_directory }}
+WorkingDirectory={{ django_app_dir }}
 ExecStart={{ venv_directory }}/bin/gunicorn \
     --workers 4 \
     --worker-class sync \

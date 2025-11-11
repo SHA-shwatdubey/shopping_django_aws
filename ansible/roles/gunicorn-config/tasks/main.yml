@@ -1,4 +1,12 @@
 ---
+- name: Create Gunicorn log directory
+  file:
+    path: /var/log/gunicorn
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0755'
+
 - name: Create Gunicorn systemd service file
   template:
     src: gunicorn.service.j2
@@ -14,11 +22,14 @@
     owner: root
     group: root
     mode: '0644'
+
 - name: Ensure systemd daemon is reloaded
   systemd:
     daemon_reload: yes
 
-- name: Restart Gunicorn service
+- name: Start and enable Gunicorn service
   systemd:
     name: gunicorn
-    state: restarted
+    state: started
+    enabled: yes
+    daemon_reload: yes
