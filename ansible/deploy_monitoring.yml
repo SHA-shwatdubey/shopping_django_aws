@@ -1,0 +1,91 @@
+---
+# Nagios Monitoring Deployment Playbook
+# Deploys Nagios monitoring infrastructure and configures targets
+
+- name: Deploy Nagios Monitoring Infrastructure
+  hosts: all
+  gather_facts: yes
+  become: yes
+  vars:
+    django_app_private_ip: "{{ hostvars['localhost']['django_app_private_ip'] | default('10.0.1.0') }}"
+    nagios_server_ip: "{{ hostvars['localhost']['nagios_server_private_ip'] | default('10.0.2.0') }}"
+
+  pre_tasks:
+    - name: Display deployment information
+      debug:
+        msg:
+          - "Deploying Nagios Monitoring System"
+          - "Django App IP: {{ django_app_private_ip }}"
+          - "Nagios Server IP: {{ nagios_server_ip }}"
+          - "Environment: {{ environment }}"
+
+    - name: Update system packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+        autoremove: yes
+        autoclean: yes
+      register: apt_update
+      retries: 3
+      until: apt_update is succeeded
+
+  roles:
+    # Install Nagios Core on monitoring server
+    - role: nagios-core
+      tags:
+        - nagios-core
+        - monitoring
+      when: inventory_hostname == 'nagios_server'
+
+    # Configure Nagios with host/service definitions
+    - role: nagios-config
+      tags:
+        - nagios-config
+        - monitoring
+      vars:
+        django_app_private_ip: "{{ django_app_private_ip }}"
+      when: inventory_hostname == 'nagios_server'
+
+    # Install NRPE client on Django app server
+    - role: nrpe-client
+      tags:
+        - nrpe-client
+        - monitoring
+      vars:
+        nagios_server_ip: "{{ nagios_server_ip }}"
+      when: inventory_hostname == 'django_app'
+
+  post_tasks:
+    - name: Verify Nagios service is running
+      systemd:
+        name: nagios
+        state: started
+        enabled: yes
+      when: inventory_hostname == 'nagios_server'
+
+    - name: Verify NRPE service is running
+      systemd:
+        name: nrpe
+        state: started
+        enabled: yes
+      when: inventory_hostname == 'django_app'
+
+    - name: Display Nagios access information
+      debug:
+        msg:
+          - "Nagios Monitoring Deployed Successfully!"
+          - "Dashboard URL: http://{{ hostvars['localhost']['nagios_server_public_ip'] }}/nagios"
+          - "Username: {{ nagios_admin_username }}"
+          - "Password: Check your password manager or GitHub secrets"
+      when: inventory_hostname == 'nagios_server'
+
+  handlers:
+    - name: Restart Nagios
+      systemd:
+        name: nagios
+        state: restarted
+
+    - name: Restart NRPE
+      systemd:
+        name: nrpe
+        state: restarted

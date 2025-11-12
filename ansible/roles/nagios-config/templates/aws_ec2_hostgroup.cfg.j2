@@ -1,0 +1,30 @@
+# AWS EC2 Host Group
+# Configuration for monitoring AWS resources
+
+define hostgroup {
+    hostgroup_name          aws-ec2-instances
+    alias                   AWS EC2 Instances
+    members                 django-app-server
+}
+
+define hostgroup {
+    hostgroup_name          production-servers
+    alias                   Production Servers
+    members                 django-app-server
+}
+
+# Service group for application monitoring
+define servicegroup {
+    servicegroup_name       django-app-services
+    alias                   Django Application Services
+}
+
+# Service group for infrastructure monitoring
+define servicegroup {
+    servicegroup_name       infrastructure-services
+    alias                   Infrastructure Services
+    members                 django-app-server,CPU Load
+    members                 django-app-server,Memory Usage
+    members                 django-app-server,Disk Usage
+    members                 django-app-server,Process Count
+}

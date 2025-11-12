@@ -1,0 +1,94 @@
+---
+# Ansible role for configuring Nagios monitoring targets
+# This configures the Django app server and AWS resources as monitoring targets
+
+- name: Create Nagios objects directory
+  file:
+    path: /etc/nagios/objects
+    state: directory
+    owner: nagios
+    group: nagios
+    mode: '0755'
+
+- name: Create Django app host configuration
+  template:
+    src: django_app_host.cfg.j2
+    dest: /etc/nagios/objects/django_app_host.cfg
+    owner: nagios
+    group: nagios
+    mode: '0644'
+  notify: Reload Nagios
+
+- name: Create service definitions for Django app
+  template:
+    src: django_app_services.cfg.j2
+    dest: /etc/nagios/objects/django_app_services.cfg
+    owner: nagios
+    group: nagios
+    mode: '0644'
+  notify: Reload Nagios
+
+- name: Create AWS EC2 host group configuration
+  template:
+    src: aws_ec2_hostgroup.cfg.j2
+    dest: /etc/nagios/objects/aws_ec2_hostgroup.cfg
+    owner: nagios
+    group: nagios
+    mode: '0644'
+  notify: Reload Nagios
+
+- name: Create custom commands for monitoring
+  template:
+    src: custom_commands.cfg.j2
+    dest: /etc/nagios/objects/custom_commands.cfg
+    owner: nagios
+    group: nagios
+    mode: '0644'
+  notify: Reload Nagios
+
+- name: Create contact definitions for alerts
+  template:
+    src: contacts.cfg.j2
+    dest: /etc/nagios/objects/contacts.cfg
+    owner: nagios
+    group: nagios
+    mode: '0644'
+  notify: Reload Nagios
+
+- name: Include monitoring objects in Nagios config
+  lineinfile:
+    path: /etc/nagios/nagios.cfg
+    line: "cfg_dir=/etc/nagios/objects"
+    state: present
+    insertafter: "^cfg_dir=/etc/nagios/objects"
+  when: "'cfg_dir=/etc/nagios/objects' not in nagios_config.stdout"
+  register: nagios_config
+
+- name: Verify Nagios configuration
+  shell: |
+    /opt/nagios/bin/nagios -v /etc/nagios/nagios.cfg
+  changed_when: False
+  register: nagios_verify
+  failed_when: "'0 errors' not in nagios_verify.stdout"
+
+- name: Create custom plugin for Django HTTP check
+  template:
+    src: check_django_health.j2
+    dest: /opt/nagios/libexec/check_django_health
+    owner: nagios
+    group: nagios
+    mode: '0755'
+
+- name: Create custom plugin for CPU monitoring
+  template:
+    src: check_cpu_load.j2
+    dest: /opt/nagios/libexec/check_cpu_load
+    owner: nagios
+    group: nagios
+    mode: '0755'
+
+- name: Restart Nagios service
+  systemd:
+    name: nagios
+    state: restarted
+    daemon_reload: yes

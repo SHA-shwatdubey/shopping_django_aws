@@ -1,0 +1,8 @@
+# Terraform variables for sensitive data
+# These should be provided via environment variables or .tfvars file
+# DO NOT commit these to version control with actual values
+
+nagios_admin_password = "ChangeMe!12345"  # Change this to a strong password
+slack_webhook_url = ""                     # Optional: Set your Slack webhook URL
+nagios_email_alerts = "admin@example.com" # Set your email for alerts
+enable_nagios_monitoring = true

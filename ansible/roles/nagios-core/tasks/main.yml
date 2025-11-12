@@ -1,0 +1,242 @@
+---
+# Ansible role for installing and configuring Nagios Core Server
+# This role installs Nagios Core, plugins, and NRPE on the monitoring server
+
+- name: Install Nagios Core dependencies
+  apt:
+    name: "{{ nagios_dependencies }}"
+    state: present
+    update_cache: yes
+  vars:
+    nagios_dependencies:
+      - libgd-dev
+      - libmcrypt-dev
+      - libssl-dev
+      - libnet-snmp-perl
+      - snmp
+      - snmp-mibs-downloader
+      - libffi-dev
+      - libpng-dev
+      - libjpeg-dev
+      - unzip
+      - wget
+      - git
+      - build-essential
+      - gdebi-core
+
+- name: Create Nagios directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: nagios
+    group: nagios
+    mode: '0755'
+  loop:
+    - /var/log/nagios
+    - /var/log/nagios/archives
+    - /var/spool/nagios
+    - /var/spool/nagios/checkresults
+    - /opt/nagios
+    - /opt/nagios/etc
+    - /opt/nagios/var
+    - /opt/nagios/libexec
+
+- name: Download Nagios Core source code
+  get_url:
+    url: "https://assets.nagios.com/downloads/nagioscore/releases/nagios-{{ nagios_core_version }}.tar.gz"
+    dest: "/tmp/nagios-{{ nagios_core_version }}.tar.gz"
+    timeout: 300
+  register: nagios_download
+  until: nagios_download is succeeded
+  retries: 3
+
+- name: Extract Nagios Core source code
+  unarchive:
+    src: "/tmp/nagios-{{ nagios_core_version }}.tar.gz"
+    dest: /tmp
+    remote_src: yes
+
+- name: Configure Nagios Core build
+  shell: |
+    cd /tmp/nagios-{{ nagios_core_version }}
+    ./configure --prefix=/opt/nagios \
+                --exec-prefix=/opt/nagios \
+                --localstatedir=/var/log/nagios \
+                --sysconfdir=/etc/nagios \
+                --with-nagios-user=nagios \
+                --with-nagios-group=nagios \
+                --with-command-group=nagcmd \
+                --enable-event-broker \
+                --enable-nagioscgi \
+                --httpd-conf=/etc/apache2/sites-available \
+                --with-httpd-user=www-data \
+                --with-httpd-group=www-data
+  changed_when: True
+
+- name: Build Nagios Core
+  shell: |
+    cd /tmp/nagios-{{ nagios_core_version }}
+    make all
+  changed_when: True
+  timeout: 600
+
+- name: Install Nagios Core
+  shell: |
+    cd /tmp/nagios-{{ nagios_core_version }}
+    make install \
+      && make install-init \
+      && make install-daemoninit \
+      && make install-config \
+      && make install-commandmode \
+      && make install-webconf \
+      && make install-exfoliation \
+      && make install-classicui
+  changed_when: True
+
+- name: Create Nagios web admin user
+  shell: |
+    htpasswd -bc /opt/nagios/etc/htpasswd.users {{ nagios_admin_username }} {{ nagios_admin_password }}
+  changed_when: True
+  no_log: true
+
+- name: Download Nagios Plugins source code
+  get_url:
+    url: "https://github.com/nagios-plugins/nagios-plugins/releases/download/release-{{ nagios_plugins_version }}/nagios-plugins-{{ nagios_plugins_version }}.tar.gz"
+    dest: "/tmp/nagios-plugins-{{ nagios_plugins_version }}.tar.gz"
+    timeout: 300
+  register: plugins_download
+  until: plugins_download is succeeded
+  retries: 3
+
+- name: Extract Nagios Plugins source code
+  unarchive:
+    src: "/tmp/nagios-plugins-{{ nagios_plugins_version }}.tar.gz"
+    dest: /tmp
+    remote_src: yes
+
+- name: Configure Nagios Plugins build
+  shell: |
+    cd /tmp/nagios-plugins-{{ nagios_plugins_version }}
+    ./configure --prefix=/opt/nagios \
+                --exec-prefix=/opt/nagios \
+                --with-nagios-user=nagios \
+                --with-nagios-group=nagios \
+                --enable-extra-opts
+  changed_when: True
+
+- name: Build Nagios Plugins
+  shell: |
+    cd /tmp/nagios-plugins-{{ nagios_plugins_version }}
+    make
+  changed_when: True
+  timeout: 600
+
+- name: Install Nagios Plugins
+  shell: |
+    cd /tmp/nagios-plugins-{{ nagios_plugins_version }}
+    make install
+  changed_when: True
+
+- name: Download NRPE source code
+  get_url:
+    url: "https://github.com/nagios-nrpe/nrpe/releases/download/nrpe-{{ nrpe_version }}/nrpe-{{ nrpe_version }}.tar.gz"
+    dest: "/tmp/nrpe-{{ nrpe_version }}.tar.gz"
+    timeout: 300
+  register: nrpe_download
+  until: nrpe_download is succeeded
+  retries: 3
+
+- name: Extract NRPE source code
+  unarchive:
+    src: "/tmp/nrpe-{{ nrpe_version }}.tar.gz"
+    dest: /tmp
+    remote_src: yes
+
+- name: Configure NRPE build
+  shell: |
+    cd /tmp/nrpe-{{ nrpe_version }}
+    ./configure --prefix=/opt/nagios \
+                --exec-prefix=/opt/nagios \
+                --sysconfdir=/etc/nagios \
+                --with-nrpe-user=nagios \
+                --with-nrpe-group=nagios \
+                --enable-command-args \
+                --enable-ssl
+  changed_when: True
+
+- name: Build NRPE
+  shell: |
+    cd /tmp/nrpe-{{ nrpe_version }}
+    make
+  changed_when: True
+  timeout: 600
+
+- name: Install NRPE
+  shell: |
+    cd /tmp/nrpe-{{ nrpe_version }}
+    make install \
+      && make install-daemon \
+      && make install-daemoninit \
+      && make install-config
+  changed_when: True
+
+- name: Ensure Nagios service is enabled and started
+  systemd:
+    name: nagios
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Ensure Apache2 is enabled and started
+  systemd:
+    name: apache2
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Enable Apache2 mod_rewrite
+  apache2_module:
+    name: rewrite
+    state: present
+  notify: Restart Apache2
+
+- name: Enable Apache2 CGI module
+  apache2_module:
+    name: cgi
+    state: present
+  notify: Restart Apache2
+
+- name: Check if Nagios configuration is valid
+  shell: |
+    /opt/nagios/bin/nagios -v /etc/nagios/nagios.cfg
+  changed_when: False
+  register: nagios_config_check
+  failed_when: "'0 errors' not in nagios_config_check.stdout"
+
+- name: Clean up source files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/nagios-{{ nagios_core_version }}"
+    - "/tmp/nagios-plugins-{{ nagios_plugins_version }}"
+    - "/tmp/nrpe-{{ nrpe_version }}"
+
+- name: Create Nagios log directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: nagios
+    group: nagios
+    mode: '0755'
+  loop:
+    - /var/log/nagios
+    - /var/log/nagios/archives
+    - /var/spool/nagios
+    - /var/spool/nagios/checkresults
+
+- name: Restart Nagios service
+  systemd:
+    name: nagios
+    state: restarted
+    daemon_reload: yes

@@ -1,0 +1,18 @@
+---
+# Variables for NRPE client role
+
+nrpe_version: "4.1.1"
+nrpe_port: 5666
+nrpe_user: "nagios"
+nrpe_group: "nagios"
+
+# NRPE server settings (Nagios monitoring server IP will be injected)
+nrpe_allowed_hosts: "127.0.0.1,::1"
+
+# Command checks for NRPE
+nrpe_command_check_local_cpu_load: "/usr/local/nagios/libexec/check_load -w 15,10,5 -c 30,25,20"
+nrpe_command_check_local_disk_all: "/opt/nagios/libexec/check_disk -w 20 -c 10 -p /"
+nrpe_command_check_local_swap: "/opt/nagios/libexec/check_swap -w 50 -c 25"
+nrpe_command_check_local_memory: "/usr/local/nagios/libexec/check_memory.sh -w 80 -c 90"
+nrpe_command_check_local_procs: "/opt/nagios/libexec/check_procs -w 250 -c 400 -s RSZDT"
+nrpe_command_check_local_uptime: "/usr/local/nagios/libexec/check_uptime.sh"

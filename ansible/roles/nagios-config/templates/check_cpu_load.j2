@@ -1,0 +1,40 @@
+#!/bin/bash
+# CPU Load Check Plugin
+# Monitors system CPU load averages
+
+LOAD_WARN=$1
+LOAD_CRIT=$2
+
+# Default thresholds if not provided
+LOAD_WARN=${LOAD_WARN:-5}
+LOAD_CRIT=${LOAD_CRIT:-10}
+
+# Get load averages
+LOAD=$(uptime | awk -F'load average:' '{print $2}' | xargs)
+LOAD_1=$(echo "$LOAD" | awk '{print $1}' | cut -d',' -f1)
+LOAD_5=$(echo "$LOAD" | awk '{print $2}' | cut -d',' -f1)
+LOAD_15=$(echo "$LOAD" | awk '{print $3}' | cut -d',' -f1)
+
+# Get number of CPU cores
+CORES=$(nproc)
+
+# Normalize load averages by CPU count
+LOAD_1_NORM=$(echo "scale=2; $LOAD_1 / $CORES" | bc)
+LOAD_5_NORM=$(echo "scale=2; $LOAD_5 / $CORES" | bc)
+LOAD_15_NORM=$(echo "scale=2; $LOAD_15 / $CORES" | bc)
+
+# Check critical threshold
+if (( $(echo "$LOAD_1 > $LOAD_CRIT" | bc -l) )); then
+    echo "CRITICAL: CPU Load $LOAD_1 exceeds critical threshold $LOAD_CRIT | load1=$LOAD_1 load5=$LOAD_5 load15=$LOAD_15"
+    exit 2
+fi
+
+# Check warning threshold
+if (( $(echo "$LOAD_1 > $LOAD_WARN" | bc -l) )); then
+    echo "WARNING: CPU Load $LOAD_1 exceeds warning threshold $LOAD_WARN | load1=$LOAD_1 load5=$LOAD_5 load15=$LOAD_15"
+    exit 1
+fi
+
+# All OK
+echo "OK: CPU Load $LOAD_1 (5min: $LOAD_5, 15min: $LOAD_15) | load1=$LOAD_1 load5=$LOAD_5 load15=$LOAD_15"
+exit 0

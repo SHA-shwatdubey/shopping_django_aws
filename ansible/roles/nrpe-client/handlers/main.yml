@@ -1,0 +1,12 @@
+---
+# Handlers for NRPE client role
+
+- name: Restart NRPE
+  systemd:
+    name: nrpe
+    state: restarted
+
+- name: Reload NRPE
+  systemd:
+    name: nrpe
+    state: reloaded

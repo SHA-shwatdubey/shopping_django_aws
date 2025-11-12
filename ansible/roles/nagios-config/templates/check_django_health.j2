@@ -1,0 +1,43 @@
+#!/bin/bash
+# Django Health Check Plugin
+# Monitors HTTP response and performance metrics of Django application
+
+HOST=$1
+PORT=${2:-80}
+TIMEOUT=${3:-10}
+
+# Check if host and port are provided
+if [ -z "$HOST" ]; then
+    echo "UNKNOWN: Host parameter not provided"
+    exit 3
+fi
+
+# Perform HTTP request and measure response time
+START=$(date +%s%N)
+HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -m "$TIMEOUT" "http://$HOST:$PORT/")
+END=$(date +%s%N)
+
+RESPONSE_TIME=$(( (END - START) / 1000000 ))
+
+# Check HTTP response code
+if [ "$HTTP_CODE" == "200" ] || [ "$HTTP_CODE" == "301" ] || [ "$HTTP_CODE" == "302" ]; then
+    if [ "$RESPONSE_TIME" -lt 1000 ]; then
+        echo "OK: HTTP $HTTP_CODE - Response time: ${RESPONSE_TIME}ms"
+        exit 0
+    elif [ "$RESPONSE_TIME" -lt 3000 ]; then
+        echo "WARNING: HTTP $HTTP_CODE - Response time: ${RESPONSE_TIME}ms"
+        exit 1
+    else
+        echo "CRITICAL: HTTP $HTTP_CODE - Response time: ${RESPONSE_TIME}ms (exceeds threshold)"
+        exit 2
+    fi
+elif [ "$HTTP_CODE" == "000" ]; then
+    echo "CRITICAL: Connection timeout or unable to connect to $HOST:$PORT"
+    exit 2
+elif [ "$HTTP_CODE" == "500" ] || [ "$HTTP_CODE" == "502" ] || [ "$HTTP_CODE" == "503" ]; then
+    echo "CRITICAL: HTTP $HTTP_CODE - Server error"
+    exit 2
+else
+    echo "WARNING: HTTP $HTTP_CODE - Unexpected response"
+    exit 1
+fi

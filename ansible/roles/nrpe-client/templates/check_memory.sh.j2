@@ -1,0 +1,36 @@
+#!/bin/bash
+# Check Memory Usage Plugin
+# Monitors RAM and available memory
+
+WARN=${1:-80}
+CRIT=${2:-90}
+
+# Get memory information
+MEMINFO=$(free -b | grep Mem)
+TOTAL=$(echo $MEMINFO | awk '{print $2}')
+USED=$(echo $MEMINFO | awk '{print $3}')
+AVAILABLE=$(echo $MEMINFO | awk '{print $7}')
+
+# Calculate percentages
+USED_PERCENT=$(echo "scale=2; $USED * 100 / $TOTAL" | bc)
+AVAILABLE_PERCENT=$(echo "scale=2; $AVAILABLE * 100 / $TOTAL" | bc)
+
+# Convert to human readable format
+USED_MB=$(echo "scale=0; $USED / 1024 / 1024" | bc)
+TOTAL_MB=$(echo "scale=0; $TOTAL / 1024 / 1024" | bc)
+
+# Check critical threshold
+if (( $(echo "$USED_PERCENT > $CRIT" | bc -l) )); then
+    echo "CRITICAL: Memory usage ${USED_PERCENT}% (${USED_MB}MB/${TOTAL_MB}MB) | memory_usage=${USED_PERCENT}%;${WARN};${CRIT};0;100"
+    exit 2
+fi
+
+# Check warning threshold
+if (( $(echo "$USED_PERCENT > $WARN" | bc -l) )); then
+    echo "WARNING: Memory usage ${USED_PERCENT}% (${USED_MB}MB/${TOTAL_MB}MB) | memory_usage=${USED_PERCENT}%;${WARN};${CRIT};0;100"
+    exit 1
+fi
+
+# All OK
+echo "OK: Memory usage ${USED_PERCENT}% (${USED_MB}MB/${TOTAL_MB}MB) | memory_usage=${USED_PERCENT}%;${WARN};${CRIT};0;100"
+exit 0

@@ -1,0 +1,50 @@
+# NRPE Client Configuration
+# Settings for Nagios Remote Plugin Executor
+
+# Allow arguments in NRPE commands
+allow_arguments=1
+
+# Allow BASH command substitution
+allow_bash_command_substitution=1
+
+# Encryption
+use_ssl=1
+ssl_version=TLSv1_2
+ssl_cipher_list=DEFAULT
+
+# Logging
+debug=0
+log_facility=daemon
+
+# PID file
+pid_file=/var/run/nrpe/nrpe.pid
+
+# NRPE server port
+server_port=5666
+
+# Allowed hosts (monitoring server IP)
+allowed_hosts=127.0.0.1,::1{% if nagios_server_ip is defined %},{{ nagios_server_ip }}{% endif %}
+
+# Command definitions
+command[check_users]=/opt/nagios/libexec/check_users -w 5 -c 10
+command[check_load]=/opt/nagios/libexec/check_load -w 15,10,5 -c 30,25,20
+command[check_disk_all]=/opt/nagios/libexec/check_disk -w 20 -c 10 -p / -p /var -p /home
+command[check_swap]=/opt/nagios/libexec/check_swap -w 50 -c 25
+command[check_memory]=/usr/local/nagios/libexec/check_memory.sh -w 80 -c 90
+command[check_zombie_procs]=/opt/nagios/libexec/check_procs -w 5 -c 10 -s Z
+command[check_total_procs]=/opt/nagios/libexec/check_procs -w 250 -c 400
+command[check_procs]=/opt/nagios/libexec/check_procs -w 250 -c 400 -s RSZDT
+command[check_uptime]=/usr/local/nagios/libexec/check_uptime.sh
+command[check_tcp]=/opt/nagios/libexec/check_tcp -H localhost -p $ARG1$
+command[check_services]=/opt/nagios/libexec/check_services.sh
+
+# Custom commands for Django monitoring
+command[check_gunicorn]=/opt/nagios/libexec/check_tcp -H 127.0.0.1 -p 8000 -w 2 -c 5
+command[check_nginx]=/opt/nagios/libexec/check_tcp -H 127.0.0.1 -p 80 -w 2 -c 5
+command[check_django_response]=/opt/nagios/libexec/check_http -H 127.0.0.1 -p 80 -w 3 -c 5
+
+# System-specific checks
+command[check_apt_updates]=/opt/nagios/libexec/check_apt
+command[check_systemd_services]=/opt/nagios/libexec/check_systemd.py
+
+# Don't make this the only command, append to existing

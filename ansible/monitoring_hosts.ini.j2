@@ -1,0 +1,22 @@
+# Nagios Monitoring Infrastructure Hosts
+# Defined based on Terraform outputs
+
+[nagios_servers]
+nagios_server ansible_host={{ nagios_server_public_ip }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+[django_servers]
+django_app ansible_host={{ django_app_public_ip }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+[monitoring:children]
+nagios_servers
+django_servers
+
+[monitoring:vars]
+ansible_python_interpreter=/usr/bin/python3
+ansible_become=yes
+ansible_become_method=sudo
+nagios_admin_username=nagiosadmin
+nagios_admin_password={{ nagios_admin_password }}
+django_app_private_ip={{ django_app_private_ip }}
+nagios_server_private_ip={{ nagios_server_private_ip }}
+environment=production

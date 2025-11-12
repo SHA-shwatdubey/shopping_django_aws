@@ -1,0 +1,50 @@
+# Custom Nagios Commands
+# Define custom check commands for monitoring
+
+# Check HTTP response from Django app
+define command {
+    command_name            check_http_django
+    command_line            $USER1$/check_http -H $HOSTADDRESS$ -p 80 -w 3 -c 5 -e 200,301,302,304
+}
+
+# Check local load via NRPE
+define command {
+    command_name            check_nrpe_local
+    command_line            $USER1$/check_nrpe -H $HOSTADDRESS$ -c $ARG1$
+}
+
+# Check remote service via TCP
+define command {
+    command_name            check_tcp
+    command_line            $USER1$/check_tcp -H $HOSTADDRESS$ -p $ARG1$ -w 2 -c 5
+}
+
+# Check HTTP with custom parameters
+define command {
+    command_name            check_http_custom
+    command_line            $USER1$/check_http -H $HOSTADDRESS$ -p $ARG1$ -w $ARG2$ -c $ARG3$
+}
+
+# Check NRPE with custom arguments
+define command {
+    command_name            check_nrpe_custom
+    command_line            $USER1$/check_nrpe -H $HOSTADDRESS$ -c $ARG1$ -a $ARG2$
+}
+
+# Django-specific health check
+define command {
+    command_name            check_django_health
+    command_line            $USER1$/check_django_health $HOSTADDRESS$ $ARG1$ $ARG2$
+}
+
+# Slack notification command
+define command {
+    command_name            notify_slack
+    command_line            /usr/local/bin/notify_slack "$NOTIFICATIONTYPE$" "$HOSTNAME$" "$SERVICEDESC$" "$SERVICESTATE$" "$SERVICEOUTPUT$"
+}
+
+# Email notification command
+define command {
+    command_name            notify_email
+    command_line            /usr/bin/printf "%b" "Service: $SERVICEDESC$\nHost: $HOSTNAME$\nState: $SERVICESTATE$\nAddress: $HOSTADDRESS$\nInfo: $SERVICEOUTPUT$\n" | mail -s "Nagios Alert: $HOSTNAME$/$SERVICEDESC$ is $SERVICESTATE$" $CONTACTEMAIL$
+}

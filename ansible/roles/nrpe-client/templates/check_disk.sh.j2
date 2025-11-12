@@ -1,0 +1,30 @@
+#!/bin/bash
+# Check Disk Usage Plugin
+# Monitors disk space utilization
+
+WARN=${1:-80}
+CRIT=${2:-90}
+FILESYSTEM=${3:-/}
+
+# Get disk information
+DISKINFO=$(df -h "$FILESYSTEM" | tail -1)
+USED_PERCENT=$(echo "$DISKINFO" | awk '{print $5}' | sed 's/%//')
+USED=$(echo "$DISKINFO" | awk '{print $3}')
+TOTAL=$(echo "$DISKINFO" | awk '{print $2}')
+AVAILABLE=$(echo "$DISKINFO" | awk '{print $4}')
+
+# Check critical threshold
+if (( USED_PERCENT > CRIT )); then
+    echo "CRITICAL: Disk usage on $FILESYSTEM is ${USED_PERCENT}% (${USED}/${TOTAL}) | disk_usage=${USED_PERCENT}%;${WARN};${CRIT};0;100"
+    exit 2
+fi
+
+# Check warning threshold
+if (( USED_PERCENT > WARN )); then
+    echo "WARNING: Disk usage on $FILESYSTEM is ${USED_PERCENT}% (${USED}/${TOTAL}) | disk_usage=${USED_PERCENT}%;${WARN};${CRIT};0;100"
+    exit 1
+fi
+
+# All OK
+echo "OK: Disk usage on $FILESYSTEM is ${USED_PERCENT}% (${USED}/${TOTAL} available) | disk_usage=${USED_PERCENT}%;${WARN};${CRIT};0;100"
+exit 0

@@ -1,0 +1,17 @@
+---
+# Handlers for Nagios Core role
+
+- name: Restart Apache2
+  systemd:
+    name: apache2
+    state: restarted
+
+- name: Restart Nagios
+  systemd:
+    name: nagios
+    state: restarted
+
+- name: Reload Nagios
+  shell: |
+    /opt/nagios/bin/nagios -v /etc/nagios/nagios.cfg && systemctl reload nagios
+  changed_when: True

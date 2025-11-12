@@ -1,0 +1,21 @@
+---
+# Variables for Nagios Core installation role
+
+nagios_core_version: "4.4.11"
+nagios_plugins_version: "2.4.6"
+nrpe_version: "4.1.1"
+nagios_admin_username: "nagiosadmin"
+nagios_admin_password: "ChangeMe!12345"
+
+# Service check intervals (in minutes)
+nagios_service_check_interval: 5
+nagios_service_retry_interval: 1
+nagios_host_check_interval: 15
+nagios_host_retry_interval: 1
+
+# Notification settings
+nagios_enable_notifications: 1
+nagios_execute_service_checks: 1
+nagios_accept_passive_service_checks: 1
+nagios_check_external_commands: 1
+nagios_default_user_name: "guest"

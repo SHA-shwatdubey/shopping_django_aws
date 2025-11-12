@@ -1,0 +1,129 @@
+---
+# Ansible role for configuring NRPE on monitoring targets
+# This installs and configures NRPE on the Django app server
+
+- name: Install NRPE dependencies
+  apt:
+    name: "{{ nrpe_dependencies }}"
+    state: present
+    update_cache: yes
+  vars:
+    nrpe_dependencies:
+      - libssl-dev
+      - wget
+      - build-essential
+      - net-tools
+
+- name: Create nagios user on target server
+  user:
+    name: nagios
+    shell: /bin/false
+    home: /var/lib/nagios
+    state: present
+
+- name: Download NRPE source code
+  get_url:
+    url: "https://github.com/nagios-nrpe/nrpe/releases/download/nrpe-{{ nrpe_version }}/nrpe-{{ nrpe_version }}.tar.gz"
+    dest: "/tmp/nrpe-{{ nrpe_version }}.tar.gz"
+    timeout: 300
+  register: nrpe_download
+  until: nrpe_download is succeeded
+  retries: 3
+
+- name: Extract NRPE source code
+  unarchive:
+    src: "/tmp/nrpe-{{ nrpe_version }}.tar.gz"
+    dest: /tmp
+    remote_src: yes
+
+- name: Configure NRPE build
+  shell: |
+    cd /tmp/nrpe-{{ nrpe_version }}
+    ./configure --prefix=/usr/local/nagios \
+                --sysconfdir=/etc/nagios \
+                --with-nrpe-user=nagios \
+                --with-nrpe-group=nagios \
+                --enable-command-args \
+                --enable-ssl
+  changed_when: True
+
+- name: Build NRPE
+  shell: |
+    cd /tmp/nrpe-{{ nrpe_version }}
+    make
+  changed_when: True
+  timeout: 600
+
+- name: Install NRPE
+  shell: |
+    cd /tmp/nrpe-{{ nrpe_version }}
+    make install \
+      && make install-daemon \
+      && make install-daemoninit \
+      && make install-config
+  changed_when: True
+
+- name: Create NRPE configuration directory
+  file:
+    path: /etc/nagios
+    state: directory
+    owner: nagios
+    group: nagios
+    mode: '0755'
+
+- name: Configure NRPE service
+  template:
+    src: nrpe.cfg.j2
+    dest: /etc/nagios/nrpe.cfg
+    owner: nagios
+    group: nagios
+    mode: '0644'
+  notify: Restart NRPE
+
+- name: Create local plugin directory
+  file:
+    path: /usr/local/nagios/libexec
+    state: directory
+    owner: nagios
+    group: nagios
+    mode: '0755'
+
+- name: Copy monitoring plugins to target
+  copy:
+    src: "{{ item }}"
+    dest: /usr/local/nagios/libexec/
+    owner: nagios
+    group: nagios
+    mode: '0755'
+  loop:
+    - "check_cpu_load.sh"
+    - "check_memory.sh"
+    - "check_disk.sh"
+    - "check_uptime.sh"
+  ignore_errors: yes
+
+- name: Create custom check plugins if not exist
+  template:
+    src: "{{ item }}.j2"
+    dest: "/usr/local/nagios/libexec/{{ item }}"
+    owner: nagios
+    group: nagios
+    mode: '0755'
+  loop:
+    - check_cpu_load.sh
+    - check_memory.sh
+    - check_disk.sh
+    - check_uptime.sh
+  ignore_errors: yes
+
+- name: Ensure NRPE daemon is enabled and started
+  systemd:
+    name: nrpe
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Clean up NRPE source files
+  file:
+    path: "/tmp/nrpe-{{ nrpe_version }}"
+    state: absent

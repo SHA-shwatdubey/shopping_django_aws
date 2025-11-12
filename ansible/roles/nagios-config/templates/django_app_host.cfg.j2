@@ -1,0 +1,26 @@
+# Django App Host Configuration
+# Monitoring target: Django application server
+
+define host {
+    use                     linux-server
+    host_name               django-app-server
+    alias                   Django Shopping Application Server
+    address                 {{ django_app_private_ip }}
+    hostgroups              django-servers
+    check_interval          15
+    retry_interval          1
+    max_check_attempts      3
+    notification_period     24x7
+    notification_interval   60
+    notification_options    d,u,r
+    contact_groups          admins
+    notes                   Production Django application server
+    notes_url               http://wiki.example.com/django-monitoring
+}
+
+# Define host group for Django servers
+define hostgroup {
+    hostgroup_name          django-servers
+    alias                   Django Application Servers
+    members                 django-app-server
+}
