@@ -205,6 +205,13 @@ jobs:
           pip install --upgrade pip
           pip install ansible>=2.10 boto3 botocore
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
       - name: Create SSH keys
         run: |
           mkdir -p ~/.ssh
@@ -253,25 +260,41 @@ jobs:
 
       - name: Wait for Nagios EC2 instance
         run: |
-          for i in {1..30}; do
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@${{ needs.terraform.outputs.nagios_ip }} "echo ready"; then
-              echo "Nagios instance is ready!"
+          echo "Waiting for Nagios instance at ${{ needs.terraform.outputs.nagios_ip }}"
+          for i in {1..60}; do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o UserKnownHostsFile=/dev/null ubuntu@${{ needs.terraform.outputs.nagios_ip }} "echo ready" 2>/dev/null; then
+              echo "✅ Nagios instance is ready!"
               break
             fi
-            echo "Attempt $i/30: Waiting..."
-            sleep 10
+            echo "Attempt $i/60: Waiting... (retry in 5s)"
+            sleep 5
+            if [ $i -eq 60 ]; then
+              echo "❌ Nagios instance failed to respond after 300 seconds"
+              exit 1
+            fi
           done
 
       - name: Wait for Django EC2 instance
         run: |
-          for i in {1..30}; do
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@${{ needs.terraform.outputs.instance_ip }} "echo ready"; then
-              echo "Django instance is ready!"
+          echo "Waiting for Django instance at ${{ needs.terraform.outputs.instance_ip }}"
+          for i in {1..60}; do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o UserKnownHostsFile=/dev/null ubuntu@${{ needs.terraform.outputs.instance_ip }} "echo ready" 2>/dev/null; then
+              echo "✅ Django instance is ready!"
               break
             fi
-            echo "Attempt $i/30: Waiting..."
-            sleep 10
+            echo "Attempt $i/60: Waiting... (retry in 5s)"
+            sleep 5
+            if [ $i -eq 60 ]; then
+              echo "❌ Django instance failed to respond after 300 seconds"
+              exit 1
+            fi
           done
+
+      - name: Display Nagios inventory
+        run: |
+          echo "=== Nagios Ansible Inventory ==="
+          cat ansible/monitoring_inventory.ini
+          echo "==== End Inventory ===="
 
       - name: Run Nagios deployment playbook
         run: |
@@ -279,7 +302,7 @@ jobs:
             -i ansible/monitoring_inventory.ini \
             -u ubuntu \
             --private-key ~/.ssh/id_rsa \
-            -v \
+            -vvv \
             ansible/deploy_monitoring.yml
         env:
           ANSIBLE_HOST_KEY_CHECKING: 'False'
