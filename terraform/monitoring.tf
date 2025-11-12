@@ -134,21 +134,21 @@ resource "aws_security_group_rule" "django_nrpe_ingress" {
   description              = "NRPE from Nagios server"
 }
 
-# Elastic IP for Nagios server (for static access)
-resource "aws_eip" "nagios_server" {
-  instance   = aws_instance.nagios_server.id
-  domain     = "vpc"
-  depends_on = [aws_instance.nagios_server]
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-nagios-eip"
-  }
-}
+# Elastic IP for Nagios server (removed - use public IP directly)
+# resource "aws_eip" "nagios_server" {
+#   instance   = aws_instance.nagios_server.id
+#   domain     = "vpc"
+#   depends_on = [aws_instance.nagios_server]
+# 
+#   tags = {
+#     Name = "${var.project_name}-${var.environment}-nagios-eip"
+#   }
+# }
 
 # Outputs for Nagios server
 output "nagios_server_public_ip" {
   description = "Public IP address of Nagios monitoring server"
-  value       = aws_eip.nagios_server.public_ip
+  value       = aws_instance.nagios_server.public_ip
 }
 
 output "nagios_server_private_ip" {
@@ -163,7 +163,7 @@ output "nagios_server_instance_id" {
 
 output "nagios_web_url" {
   description = "URL to access Nagios web dashboard"
-  value       = "http://${aws_eip.nagios_server.public_ip}/nagios"
+  value       = "http://${aws_instance.nagios_server.public_ip}/nagios"
 }
 
 output "django_app_private_ip" {
