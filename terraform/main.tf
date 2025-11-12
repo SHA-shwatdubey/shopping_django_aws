@@ -4,6 +4,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
   }
 
   # Uncomment and configure for remote state (S3 backend)
@@ -33,7 +37,15 @@ locals {
   key_pair_name = "${var.project_name}-${var.environment}-key"
 }
 
-# Try to create key pair - if it already exists, ignore the error
+# First, delete any existing key pair to avoid duplicates
+resource "null_resource" "cleanup_keypair" {
+  provisioner "local-exec" {
+    command = "try { aws ec2 delete-key-pair --key-name ${local.key_pair_name} --region ${var.aws_region} } catch { }"
+    interpreter = ["PowerShell", "-Command"]
+  }
+}
+
+# Try to create key pair
 resource "aws_key_pair" "django_app" {
   count      = 1
   key_name   = local.key_pair_name
@@ -43,11 +55,7 @@ resource "aws_key_pair" "django_app" {
     Name = "${var.project_name}-${var.environment}-keypair"
   }
 
-  # Delete existing key pair before creating
-  provisioner "local-exec" {
-    command = "aws ec2 delete-key-pair --key-name ${local.key_pair_name} --region ${var.aws_region} 2>/dev/null || true"
-    when    = create
-  }
+  depends_on = [null_resource.cleanup_keypair]
 
   lifecycle {
     ignore_changes = all
