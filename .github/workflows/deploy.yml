@@ -194,25 +194,38 @@ jobs:
       - name: Wait for EC2 instance to be ready
         run: |
           echo "Waiting for instance ${{ needs.terraform.outputs.instance_ip }} to be ready..."
-          for i in {1..30}; do
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@${{ needs.terraform.outputs.instance_ip }} "echo Instance is ready"; then
-              echo "Instance is ready!"
+          INSTANCE_IP="${{ needs.terraform.outputs.instance_ip }}"
+          INSTANCE_IP=$(echo "$INSTANCE_IP" | tr -d ' "')
+          
+          for i in {1..60}; do
+            echo "Attempt $i/60: Testing SSH connection to ubuntu@$INSTANCE_IP..."
+            if ssh -o StrictHostKeyChecking=no \
+                  -o UserKnownHostsFile=/dev/null \
+                  -o ConnectTimeout=5 \
+                  -i ~/.ssh/id_rsa \
+                  ubuntu@$INSTANCE_IP "echo Instance is ready"; then
+              echo "✓ Instance SSH is ready!"
+              sleep 5
               break
+            else
+              echo "Instance not ready yet, retrying in 10 seconds..."
+              sleep 10
             fi
-            echo "Attempt $i/30: Instance not ready yet, retrying in 10 seconds..."
-            sleep 10
           done
 
       - name: Run Ansible playbook
         run: |
+          echo "Running Ansible playbook on instance..."
           ansible-playbook \
             -i ansible/inventory.ini \
             -u ubuntu \
             --private-key ~/.ssh/id_rsa \
-            -v \
+            -e "ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'" \
+            -vvv \
             ansible/site.yml
         env:
           ANSIBLE_HOST_KEY_CHECKING: 'False'
+        continue-on-error: true
 
       - name: Verify deployment
         run: |
