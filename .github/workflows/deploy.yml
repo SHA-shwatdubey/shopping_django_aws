@@ -175,10 +175,11 @@ jobs:
           
           cat > ansible/inventory.ini <<'INVENTORY'
           [django_servers]
-          django_server_1 ansible_host=INSTANCE_IP_PLACEHOLDER ansible_user=ubuntu
+          django_server_1 ansible_host=INSTANCE_IP_PLACEHOLDER ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
           
           [django_servers:vars]
           ansible_python_interpreter=/usr/bin/python3
+          ansible_ssh_common_args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
           django_repo_url=https://github.com/REPO_URL_PLACEHOLDER.git
           django_secret_key=SECRET_KEY_PLACEHOLDER
           INVENTORY
