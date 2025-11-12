@@ -2,8 +2,14 @@
 # This creates a separate EC2 instance for running Nagios Core
 
 # Generate unique suffix for security group names to avoid conflicts
+resource "random_string" "sg_suffix" {
+  length  = 6
+  special = false
+  upper   = false
+}
+
 locals {
-  sg_suffix = substr(replace(timestamp(), "/[:-]/", ""), 0, 8)
+  sg_suffix = random_string.sg_suffix.result
 }
 
 # Security group for Nagios monitoring server

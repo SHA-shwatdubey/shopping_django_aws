@@ -35,7 +35,7 @@ locals {
   create_resources = true
 }
 
-# Create key pair (will use existing if already created)
+# Try to use existing key pair, create if it doesn't exist
 resource "aws_key_pair" "django_app" {
   count      = local.create_resources ? 1 : 0
   key_name   = local.key_pair_name
