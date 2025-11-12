@@ -63,6 +63,13 @@ jobs:
           cat terraform.tfvars
         working-directory: ./terraform
 
+      - name: Cleanup Existing Keypair (if exists)
+        run: |
+          echo "Cleaning up existing keypair to avoid duplicates..."
+          aws ec2 delete-key-pair --key-name shoppinglyx-dev-key --region ap-south-1 2>/dev/null || echo "Keypair doesn't exist or already deleted"
+          sleep 2
+        continue-on-error: true
+
       - name: Terraform Init
         run: terraform init
         working-directory: ./terraform
