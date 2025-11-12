@@ -63,59 +63,6 @@ jobs:
           cat terraform.tfvars
         working-directory: ./terraform
 
-      - name: Cleanup AWS Resources (Key Pairs & Security Groups)
-        run: |
-          echo "Deleting orphaned AWS resources..."
-          
-          # Delete all shoppinglyx key pairs
-          aws ec2 describe-key-pairs --region ap-south-1 --query 'KeyPairs[?starts_with(KeyName, `shoppinglyx`)].KeyName' --output text | while read key; do
-            if [ ! -z "$key" ]; then
-              echo "Deleting key pair: $key"
-              aws ec2 delete-key-pair --key-name "$key" --region ap-south-1 2>/dev/null && echo "✓ Deleted: $key" || echo "✗ Failed: $key"
-            fi
-          done
-          
-          # Delete all shoppinglyx security groups
-          aws ec2 describe-security-groups --region ap-south-1 --filters "Name=group-name,Values=shoppinglyx-*" --query 'SecurityGroups[*].GroupId' --output text | while read sg; do
-            if [ ! -z "$sg" ]; then
-              echo "Deleting security group: $sg"
-              aws ec2 delete-security-group --group-id "$sg" --region ap-south-1 2>/dev/null && echo "✓ Deleted: $sg" || echo "✗ Failed: $sg (may have dependencies)"
-            fi
-          done
-          
-          echo "Cleanup completed"
-        env:
-          AWS_REGION: ap-south-1
-        continue-on-error: true
-
-      - name: Terraform Init (for cleanup)
-        run: terraform init
-        working-directory: ./terraform
-        continue-on-error: true
-
-      - name: Terraform Destroy Previous Resources
-        run: terraform destroy -auto-approve -var-file=terraform.tfvars || true
-        working-directory: ./terraform
-        continue-on-error: true
-
-      - name: Clean Terraform State (Remove conflicting resources)
-        run: |
-          # Backup old state
-          cp terraform.tfstate terraform.tfstate.backup || true
-          
-          # Remove ALL state resources that might conflict
-          terraform state list 2>/dev/null | while read resource; do
-            case "$resource" in
-              aws_key_pair*|aws_security_group*|aws_security_group_rule*)
-                terraform state rm "$resource" || true
-                ;;
-            esac
-          done
-          
-          echo "Terraform state cleaned"
-        working-directory: ./terraform
-        continue-on-error: true
-
       - name: Terraform Init
         run: terraform init
         working-directory: ./terraform
