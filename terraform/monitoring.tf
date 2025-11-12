@@ -1,9 +1,14 @@
 # Terraform configuration for Nagios Monitoring Server
 # This creates a separate EC2 instance for running Nagios Core
 
+# Generate unique suffix for security group names to avoid conflicts
+locals {
+  sg_suffix = substr(replace(timestamp(), "/[:-]/", ""), 0, 8)
+}
+
 # Security group for Nagios monitoring server
 resource "aws_security_group" "nagios_server" {
-  name        = "${var.project_name}-${var.environment}-nagios-sg"
+  name        = "${var.project_name}-${var.environment}-nagios-sg-${local.sg_suffix}"
   description = "Security group for Nagios monitoring server"
   vpc_id      = var.vpc_id
 
@@ -50,7 +55,7 @@ resource "aws_security_group" "nagios_server" {
 
 # Security group for NRPE clients (attached to Django app instance)
 resource "aws_security_group" "nagios_nrpe" {
-  name        = "${var.project_name}-${var.environment}-nagios-nrpe-sg"
+  name        = "${var.project_name}-${var.environment}-nagios-nrpe-sg-${local.sg_suffix}"
   description = "Security group for Nagios NRPE clients"
   vpc_id      = var.vpc_id
 
