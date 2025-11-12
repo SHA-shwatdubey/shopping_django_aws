@@ -81,6 +81,12 @@ jobs:
         run: terraform init
         working-directory: ./terraform
 
+      - name: Remove Keypair from State (to force recreation)
+        run: |
+          cd terraform
+          terraform state rm aws_key_pair.django_app 2>/dev/null || echo "Keypair not in state, skipping removal"
+        continue-on-error: true
+
       - name: Terraform Plan
         run: terraform plan -out=tfplan -var-file=terraform.tfvars
         working-directory: ./terraform
