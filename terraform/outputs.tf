@@ -30,14 +30,14 @@ output "key_pair_name" {
 
 output "ssh_connection_string" {
   description = "SSH command to connect to the instance"
-  value       = "ssh -i ${var.public_key_path} ubuntu@${try(aws_eip.django_app[0].public_ip, aws_instance.django_app.public_ip)}"
+  value       = "ssh -i ${var.public_key_path} ubuntu@${aws_instance.django_app.public_ip}"
 }
 
 # Output for Ansible inventory
 output "ansible_inventory" {
   description = "Ansible inventory format for the EC2 instance"
   value = {
-    instance_ip   = try(aws_eip.django_app[0].public_ip, aws_instance.django_app.public_ip)
+    instance_ip   = aws_instance.django_app.public_ip
     instance_user = "ubuntu"
     instance_id   = aws_instance.django_app.id
   }
