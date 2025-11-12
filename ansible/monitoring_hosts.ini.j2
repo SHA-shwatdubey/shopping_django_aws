@@ -15,8 +15,8 @@ django_servers
 ansible_python_interpreter=/usr/bin/python3
 ansible_become=yes
 ansible_become_method=sudo
-nagios_admin_username=nagiosadmin
-nagios_admin_password={{ nagios_admin_password }}
+nagios_admin_username=admin
+nagios_admin_password=admin123
 django_app_private_ip={{ django_app_private_ip }}
 nagios_server_private_ip={{ nagios_server_private_ip }}
 environment=production

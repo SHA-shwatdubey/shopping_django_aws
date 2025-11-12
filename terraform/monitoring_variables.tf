@@ -26,13 +26,14 @@ variable "nagios_root_volume_size" {
 variable "nagios_admin_username" {
   description = "Nagios web interface admin username"
   type        = string
-  default     = "nagiosadmin"
+  default     = "admin"
   sensitive   = true
 }
 
 variable "nagios_admin_password" {
   description = "Nagios web interface admin password"
   type        = string
+  default     = "admin123"
   sensitive   = true
 }
 
