@@ -37,36 +37,25 @@ locals {
   key_pair_name = "${var.project_name}-${var.environment}-key"
 }
 
-# First, delete any existing key pair to avoid duplicates
-resource "null_resource" "cleanup_keypair" {
-  provisioner "local-exec" {
-    command = "try { aws ec2 delete-key-pair --key-name ${local.key_pair_name} --region ${var.aws_region} } catch { }"
-    interpreter = ["PowerShell", "-Command"]
-  }
-}
-
-# Try to create key pair
-resource "aws_key_pair" "django_app" {
-  count      = 1
-  key_name   = local.key_pair_name
-  public_key = file(var.public_key_path)
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-keypair"
-  }
-
-  depends_on = [null_resource.cleanup_keypair]
-
-  lifecycle {
-    ignore_changes = all
-  }
-}
+# Don't create key pair - assume it already exists or user will create it manually
+# This avoids the duplicate key pair error in CI/CD
+# resource "aws_key_pair" "django_app" {
+#   count      = 0  # Disabled to prevent duplicate key pair errors
+#   key_name   = local.key_pair_name
+#   public_key = file(var.public_key_path)
+#
+#   tags = {
+#     Name = "${var.project_name}-${var.environment}-keypair"
+#   }
+#
+#   lifecycle {
+#     ignore_changes = all
+#   }
+# }
 
 # Data source to get new or existing key pair
 data "aws_key_pair" "existing_or_new" {
   key_name = local.key_pair_name
-  
-  depends_on = [aws_key_pair.django_app]
 }
 
 # Data source to check for existing security group

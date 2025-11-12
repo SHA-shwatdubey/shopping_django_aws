@@ -42,6 +42,20 @@ jobs:
           ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
           cat ~/.ssh/id_rsa.pub
 
+      - name: Ensure AWS Keypair Exists
+        run: |
+          KEY_NAME="shoppinglyx-dev-key"
+          PUBLIC_KEY=$(cat ~/.ssh/id_rsa.pub)
+          
+          # Check if key exists
+          if aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region ap-south-1 2>/dev/null; then
+            echo "✓ Key pair already exists"
+          else
+            echo "Creating new key pair..."
+            aws ec2 import-key-pair --key-name "$KEY_NAME" --public-key-material "$PUBLIC_KEY" --region ap-south-1
+            echo "✓ Key pair created"
+          fi
+
       - name: Terraform Format Check
         run: terraform fmt -check -recursive
         working-directory: ./terraform
