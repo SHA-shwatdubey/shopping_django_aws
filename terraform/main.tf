@@ -31,14 +31,11 @@ provider "aws" {
 # Local to check if key pair should be created
 locals {
   key_pair_name = "${var.project_name}-${var.environment}-key"
-  # Set to true to create new resources, false to use existing
-  create_resources = true
 }
 
-# Try to create key pair only if it doesn't exist
-# Use try() to handle the case where key pair doesn't exist yet
+# Try to create key pair - if it already exists, ignore the error
 resource "aws_key_pair" "django_app" {
-  count      = local.create_resources ? 1 : 0
+  count      = 1
   key_name   = local.key_pair_name
   public_key = file(var.public_key_path)
 
@@ -46,9 +43,14 @@ resource "aws_key_pair" "django_app" {
     Name = "${var.project_name}-${var.environment}-keypair"
   }
 
+  # Delete existing key pair before creating
+  provisioner "local-exec" {
+    command = "aws ec2 delete-key-pair --key-name ${local.key_pair_name} --region ${var.aws_region} 2>/dev/null || true"
+    when    = create
+  }
+
   lifecycle {
     ignore_changes = all
-    create_before_destroy = true
   }
 }
 
