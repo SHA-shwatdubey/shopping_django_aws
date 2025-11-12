@@ -34,24 +34,6 @@ resource "aws_security_group" "nagios_server" {
     description = "Nagios Web UI HTTPS"
   }
 
-  # Allow NRPE (Nagios Remote Plugin Executor) communication (port 5666)
-  ingress {
-    from_port       = 5666
-    to_port         = 5666
-    protocol        = "tcp"
-    security_groups = [aws_security_group.nagios_nrpe.id]
-    description     = "NRPE from Nagios clients"
-  }
-
-  # Allow custom Nagios port (5667) for additional monitoring
-  ingress {
-    from_port       = 5667
-    to_port         = 5667
-    protocol        = "tcp"
-    security_groups = [aws_security_group.nagios_nrpe.id]
-    description     = "Custom Nagios monitoring port"
-  }
-
   # Allow all outbound traffic
   egress {
     from_port   = 0
@@ -72,24 +54,6 @@ resource "aws_security_group" "nagios_nrpe" {
   description = "Security group for Nagios NRPE clients"
   vpc_id      = var.vpc_id
 
-  # Allow NRPE (port 5666) from Nagios server
-  ingress {
-    from_port       = 5666
-    to_port         = 5666
-    protocol        = "tcp"
-    security_groups = [aws_security_group.nagios_server.id]
-    description     = "NRPE from Nagios server"
-  }
-
-  # Allow custom port (5667) from Nagios server
-  ingress {
-    from_port       = 5667
-    to_port         = 5667
-    protocol        = "tcp"
-    security_groups = [aws_security_group.nagios_server.id]
-    description     = "Custom Nagios port from server"
-  }
-
   # Allow all outbound traffic
   egress {
     from_port   = 0
@@ -102,6 +66,28 @@ resource "aws_security_group" "nagios_nrpe" {
   tags = {
     Name = "${var.project_name}-${var.environment}-nagios-nrpe-sg"
   }
+}
+
+# Allow Nagios server to receive connections FROM NRPE agents (for some plugins)
+resource "aws_security_group_rule" "nagios_server_nrpe_ingress" {
+  type                     = "ingress"
+  from_port                = 5666
+  to_port                  = 5666
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.nagios_nrpe.id
+  security_group_id        = aws_security_group.nagios_server.id
+  description              = "NRPE agents can contact Nagios server"
+}
+
+# Allow NRPE agents to receive NRPE check queries from Nagios server
+resource "aws_security_group_rule" "nrpe_from_nagios_server" {
+  type                     = "ingress"
+  from_port                = 5666
+  to_port                  = 5666
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.nagios_server.id
+  security_group_id        = aws_security_group.nagios_nrpe.id
+  description              = "Allow Nagios server to query NRPE agents"
 }
 
 # EC2 instance for Nagios monitoring server
